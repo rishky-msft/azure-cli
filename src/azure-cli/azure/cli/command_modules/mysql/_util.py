@@ -4,6 +4,7 @@
 # --------------------------------------------------------------------------------------------
 
 # pylint: disable=unused-argument, line-too-long, import-outside-toplevel, raise-missing-from
+import json
 import os
 import random
 import subprocess
@@ -574,19 +575,33 @@ def get_firewall_rules_from_paged_response(firewall_rules):
     return list(firewall_rules) if isinstance(firewall_rules, ItemPaged) else firewall_rules
 
 
+def get_import_from_storage_operation_progress_response_message_parser(operation_progress_response, cnt):
+    testprefix = str(cnt) + "----"
+
+    try:
+        jsonresp = json.loads(operation_progress_response.text())
+        retmsg = str(jsonresp["status"])
+        if "properties" in jsonresp and "estimatedCompletionTime" in jsonresp["properties"]:
+            retmsg = retmsg + str(jsonresp["properties"]["estimatedCompletionTime"])
+        return testprefix + "----" + retmsg
+    except Exception as e:
+        return testprefix + "Exception" + e.message
+    
+
 class OperationProgressBar(IndeterminateProgressBar):
 
     """ Define progress bar update view """
-    def __init__(self, cli_ctx, location_url):
+    def __init__(self, cli_ctx, location_url, opertion_progress_resp_msg_parser):
         self.cnt = 0
         self._client = get_mysql_flexible_management_client(cli_ctx)
         self.operation_progress_request = HttpRequest('GET', location_url)
+        self.operation_progress_resp_msg_parser = opertion_progress_resp_msg_parser
         super().__init__(cli_ctx)
 
     def update_progress(self):
         self.cnt = self.cnt + 1
         resp = self._get_operation_progress_resp()
-        self.message = str(self.cnt) + "-----" + resp.text()
+        self.message = self.operation_progress_resp_msg_parser(resp, self.cnt)
         super().update_progress()
 
     def _get_operation_progress_resp(self):
