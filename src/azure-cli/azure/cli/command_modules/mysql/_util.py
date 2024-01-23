@@ -32,7 +32,7 @@ from azure.mgmt.rdbms import mysql_flexibleservers, postgresql_flexibleservers
 from azure.mgmt.resource.resources.models import ResourceGroup
 from ._client_factory import resource_client_factory, cf_mysql_flexible_location_capabilities, get_mysql_flexible_management_client
 from azure.cli.core.commands.validators import get_default_location_from_resource_group, validate_tags
-
+from urllib.parse import urlencode, urlparse, parse_qsl
 
 logger = get_logger(__name__)
 
@@ -586,24 +586,31 @@ def get_import_from_storage_operation_progress_response_message_parser(operation
         return testprefix + "----" + retmsg
     except Exception as e:
         return testprefix + "Exception" + e.message
-    
+
 
 class OperationProgressBar(IndeterminateProgressBar):
 
     """ Define progress bar update view """
-    def __init__(self, cli_ctx, location_url, opertion_progress_resp_msg_parser):
+    def __init__(self, cli_ctx, initial_response, opertion_progress_resp_msg_parser):
         self.cnt = 0
+        self.initial_response = initial_response
         self._client = get_mysql_flexible_management_client(cli_ctx)
-        self.operation_progress_request = HttpRequest('GET', location_url)
+        self.operation_progress_url = self._get_operation_progress_url()
+        self.operation_progress_request = HttpRequest('GET', self.operation_progress_url)
         self.operation_progress_resp_msg_parser = opertion_progress_resp_msg_parser
         super().__init__(cli_ctx)
 
     def update_progress(self):
         self.cnt = self.cnt + 1
-        resp = self._get_operation_progress_resp()
-        self.message = self.operation_progress_resp_msg_parser(resp, self.cnt)
+        opertion_progress_resp = self._client._send_request(self.operation_progress_request)
+        self.message = self.operation_progress_resp_msg_parser(opertion_progress_resp, self.cnt)
         super().update_progress()
-
-    def _get_operation_progress_resp(self):
-        return self._client._send_request(self.operation_progress_request)
+    
+    def _get_operation_progress_url(self):
+        location_url = self.initial_response.http_response.headers["Location"]
+        operation_progress_url = location_url.replace('operationResults', 'operationProgress')
+        operation_progress_url_parsed = urlparse(operation_progress_url)
+        query_params = dict(parse_qsl(operation_progress_url_parsed.query))
+        query_params['api-version'] = "2023-12-01-preview"
+        return operation_progress_url_parsed._replace(query=urlencode(query_params)).geturl()
         
