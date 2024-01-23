@@ -62,7 +62,7 @@ azure-mgmt-msi==7.0.0
 azure-mgmt-netapp==10.1.0
 azure-mgmt-policyinsights==1.1.0b4
 azure-mgmt-privatedns==1.0.0
-file:///C:/Users/rishabhkumar/Downloads/python_sdk_2023-12-01-preview/azure_mgmt_rdbms-10.2.0b13-py3-none-any.whl
+azure-mgmt-rdbms==10.2.0b12
 azure-mgmt-recoveryservices==2.5.0
 azure-mgmt-recoveryservicesbackup==7.0.0
 azure-mgmt-redhatopenshift==1.4.0
