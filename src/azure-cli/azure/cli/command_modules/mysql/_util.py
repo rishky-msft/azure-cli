@@ -19,6 +19,7 @@ from knack.prompting import prompt_pass, prompt_y_n, NoTTYException
 from msrestazure.tools import parse_resource_id
 from msrestazure.azure_exceptions import CloudError
 from azure.cli.core.commands.client_factory import get_subscription_id
+from azure.cli.core.commands.progress import IndeterminateProgressBar
 from azure.cli.core.util import CLIError
 from azure.core.exceptions import HttpResponseError
 from azure.core.paging import ItemPaged
@@ -105,9 +106,9 @@ def retryable_method(retries=3, interval_sec=5, exception_type=Exception, condit
     return decorate
 
 
-def resolve_poller(result, cli_ctx, name):
+def resolve_poller(result, cli_ctx, name, progress_bar = None):
     if _is_poller(result):
-        return LongRunningOperation(cli_ctx, 'Starting {}'.format(name))(result)
+        return LongRunningOperation(cli_ctx, 'Starting {}'.format(name), progress_bar=progress_bar)(result)
     return result
 
 
@@ -570,3 +571,15 @@ def get_single_to_flex_sku_mapping(source_single_server_sku, tier, sku_name):
 
 def get_firewall_rules_from_paged_response(firewall_rules):
     return list(firewall_rules) if isinstance(firewall_rules, ItemPaged) else firewall_rules
+
+
+class OperationProgressBar(IndeterminateProgressBar):
+    """ Define progress bar update view """
+    def __init__(self, cli_ctx):
+        self.cnt = 0
+        super().__init__(cli_ctx)
+
+    def update_progress(self):
+        self.cnt = self.cnt + 1
+        self.message = "Rishabh-" + str(self.cnt)
+        super().update_progress()
