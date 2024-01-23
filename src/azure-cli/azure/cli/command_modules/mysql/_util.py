@@ -576,18 +576,26 @@ def get_firewall_rules_from_paged_response(firewall_rules):
 
 
 def get_import_from_storage_operation_progress_response_message_parser(operation_progress_response, cnt):
-    testprefix = str(cnt) + "----"
+    if operation_progress_response is not None:
+        try:
+            jsonresp = json.loads(operation_progress_response.text())
+            if "status" in jsonresp:
+                retmsg = str(jsonresp["status"])
+                if "properties" in jsonresp and "estimatedCompletionTime" in jsonresp["properties"]:
+                    retmsg = retmsg + str(jsonresp["properties"]["estimatedCompletionTime"])
+                return  retmsg
+        except:
+            pass
+    
+    return None
 
-    try:
-        jsonresp = json.loads(operation_progress_response.text())
-        retmsg = str(jsonresp["status"])
-        if "properties" in jsonresp and "estimatedCompletionTime" in jsonresp["properties"]:
-            retmsg = retmsg + str(jsonresp["properties"]["estimatedCompletionTime"])
-        return testprefix + "----" + retmsg
-    except Exception as e:
-        return testprefix + "Exception" + e.message
-
-
+"""
+TODO: 
+1. Rate control.
+2. Error handling.
+3. Better estimated time completion parsing.
+4. initial_response vs poller
+"""
 class OperationProgressBar(IndeterminateProgressBar):
 
     """ Define progress bar update view """
@@ -602,8 +610,15 @@ class OperationProgressBar(IndeterminateProgressBar):
 
     def update_progress(self):
         self.cnt = self.cnt + 1
-        opertion_progress_resp = self._client._send_request(self.operation_progress_request)
-        self.message = self.operation_progress_resp_msg_parser(opertion_progress_resp, self.cnt)
+        operation_progress_resp = None
+        try:
+            operation_progress_resp = self._client._send_request(self.operation_progress_request)
+        except:
+            pass
+
+        operation_progress_message = self.operation_progress_resp_msg_parser(operation_progress_resp, self.cnt)
+        if operation_progress_message is not None:
+            self.message = operation_progress_message
         super().update_progress()
     
     def _get_operation_progress_url(self):
@@ -612,5 +627,4 @@ class OperationProgressBar(IndeterminateProgressBar):
         operation_progress_url_parsed = urlparse(operation_progress_url)
         query_params = dict(parse_qsl(operation_progress_url_parsed.query))
         query_params['api-version'] = "2023-12-01-preview"
-        return operation_progress_url_parsed._replace(query=urlencode(query_params)).geturl()
-        
+        return operation_progress_url_parsed._replace(query=urlencode(query_params)).geturl()        
