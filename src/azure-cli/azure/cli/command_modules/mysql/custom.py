@@ -1408,7 +1408,8 @@ def _import_create_server(db_context, cmd, resource_group_name, server_name, cre
     import_progress_bar = None
 
     if data_source_type.lower() == "azure_blob":
-        import_progress_bar = OperationProgressBar(cmd.cli_ctx)  
+        location_url = import_poller._polling_method._initial_response.http_response.headers["Location"]
+        import_progress_bar = OperationProgressBar(cmd.cli_ctx, location_url)  
 
     return resolve_poller(
         import_poller, cmd.cli_ctx,

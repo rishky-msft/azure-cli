@@ -23,12 +23,13 @@ from azure.cli.core.commands.progress import IndeterminateProgressBar
 from azure.cli.core.util import CLIError
 from azure.core.exceptions import HttpResponseError
 from azure.core.paging import ItemPaged
+from azure.core.rest import HttpRequest
 from azure.cli.core.commands import LongRunningOperation, AzArgumentContext, _is_poller
 from azure.cli.core.azclierror import RequiredArgumentMissingError, InvalidArgumentValueError, AuthenticationError
 from azure.cli.command_modules.role.custom import create_service_principal_for_rbac
 from azure.mgmt.rdbms import mysql_flexibleservers, postgresql_flexibleservers
 from azure.mgmt.resource.resources.models import ResourceGroup
-from ._client_factory import resource_client_factory, cf_mysql_flexible_location_capabilities
+from ._client_factory import resource_client_factory, cf_mysql_flexible_location_capabilities, get_mysql_flexible_management_client
 from azure.cli.core.commands.validators import get_default_location_from_resource_group, validate_tags
 
 
@@ -574,12 +575,20 @@ def get_firewall_rules_from_paged_response(firewall_rules):
 
 
 class OperationProgressBar(IndeterminateProgressBar):
+
     """ Define progress bar update view """
-    def __init__(self, cli_ctx):
+    def __init__(self, cli_ctx, location_url):
         self.cnt = 0
+        self._client = get_mysql_flexible_management_client(cli_ctx)
+        self.operation_progress_request = HttpRequest('GET', location_url)
         super().__init__(cli_ctx)
 
     def update_progress(self):
         self.cnt = self.cnt + 1
-        self.message = "Rishabh-" + str(self.cnt)
+        resp = self._get_operation_progress_resp()
+        self.message = str(self.cnt) + "-----" + resp.text()
         super().update_progress()
+
+    def _get_operation_progress_resp(self):
+        return self._client._send_request(self.operation_progress_request)
+        
