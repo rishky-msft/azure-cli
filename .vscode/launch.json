@@ -9,16 +9,7 @@
             "program": "${workspaceRoot}/src/azure-cli/azure/cli/__main__.py",
             "cwd": "${workspaceRoot}",
             "args": [
-                "mysql",
-                "flexible-server",
-                "create",
-                "-g",
-                "rishtestneu",
-                "--name",
-                "rishclitest11",
-                "--location",
-                "northeurope",
-                "--debug"
+                "--help"
             ],
             "console": "integratedTerminal",
             "debugOptions": [
@@ -26,7 +17,7 @@
                 "WaitOnNormalExit",
                 "RedirectOutput"
             ],
-            "justMyCode": false,
+            "justMyCode": false
         },
         {
             "name": "Azure CLI Debug (External Console)",
@@ -37,36 +28,13 @@
             "program": "${workspaceRoot}/src/azure-cli/azure/cli/__main__.py",
             "cwd": "${workspaceRoot}",
             "args": [
-                "mysql",
-                "flexible-server",
-                "import",
-                "create",
-                "-g",
-                "rishabhkumar-group",
-                "--name",
-                "rishtestcli92",
-                "--location",
-                "southcentralus",
-                "--data-source-type",
-                "azure_blob",
-                "--data-source",
-                "https://rishpercona.blob.core.windows.net/mysqlvm-57",
-                "--data-source-backup-dir",
-                "data",
-                "--version",
-                "5.7",
-                "--data-source-sas-token",
-                "${importSasToken}",
-                "--debug"
+                "--help"
             ],
             "console": "externalTerminal",
             "debugOptions": [
                 "WaitOnAbnormalExit",
                 "WaitOnNormalExit"
-            ],
-            "env" : {
-                "importSasToken": "sp=rl&st=2024-01-23T05:10:48Z&se=2024-01-24T13:10:48Z&spr=https&sv=2022-11-02&sr=c&sig=m8XwgHTrnIDBotpBk8FhLl2H8qKgN%2FSOON3EZxJSGu8%3D"
-            }
+            ]
         },
         {
             "name": "Azdev Scripts",
