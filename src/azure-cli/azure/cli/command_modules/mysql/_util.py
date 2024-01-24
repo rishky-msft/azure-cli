@@ -666,11 +666,6 @@ class ImportFromStorageProgressHook:
                 self._import_estimated_completion_time = str(progress_resp_json["properties"]["estimatedCompletionTime"])
             
 
-"""
-TODO: 
-2. Error handling.
-3. Better estimated time completion parsing.
-"""
 class OperationProgressBar(IndeterminateProgressBar):
 
     """ Define progress bar update view for operation progress """
