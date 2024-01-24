@@ -577,28 +577,16 @@ def get_firewall_rules_from_paged_response(firewall_rules):
     return list(firewall_rules) if isinstance(firewall_rules, ItemPaged) else firewall_rules
 
 
-def get_import_from_storage_operation_progress_response_message_parser(operation_progress_response, cnt):
-    if operation_progress_response is not None:
-        try:
-            jsonresp = json.loads(operation_progress_response.text())
-            if "status" in jsonresp:
-                retmsg = str(jsonresp["status"])
-                if "properties" in jsonresp and "estimatedCompletionTime" in jsonresp["properties"]:
-                    retmsg = retmsg + str(jsonresp["properties"]["estimatedCompletionTime"])
-                return  retmsg
-        except:
-            pass
-    
-    return None
-
 def get_current_utc_time():
     return datetime.utcnow().replace(tzinfo=dt.timezone.utc)
+
 
 class ImportFromStorageState(Enum):
     STARTING = "Starting"
     PROVISIONING = "Provisioning Server"
     IMPORTING = "Importing"
     DEFAULT = "Running"
+
 
 class ImportFromStorageProgressHook:
 
