@@ -606,9 +606,9 @@ class ImportFromStorageProgressHook:
     def get_progress_message(self):
         msg = self._import_state.value
         if self._import_estimated_completion_time is not None:
-            msg = msg + "  " + self._get_eta_time_duration_in_user_readable_string()
+            msg = msg + " " + self._get_eta_time_duration_in_user_readable_string()
         elif self._import_state == ImportFromStorageState.IMPORTING :
-            msg = msg + "  " + "Initialzing (This might take few minutes)"
+            msg = msg + " " + "Preparing (This might take few minutes)"
 
         return msg
     
