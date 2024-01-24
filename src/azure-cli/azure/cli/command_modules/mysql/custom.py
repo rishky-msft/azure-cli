@@ -29,7 +29,7 @@ from ._client_factory import get_mysql_flexible_management_client, cf_mysql_flex
 from ._util import resolve_poller, generate_missing_parameters, get_mysql_list_skus_info, generate_password, parse_maintenance_window, \
     replace_memory_optimized_tier, build_identity_and_data_encryption, get_identity_and_data_encryption, get_tenant_id, run_subprocess, \
     run_subprocess_get_output, fill_action_template, get_git_root_dir, get_single_to_flex_sku_mapping, get_firewall_rules_from_paged_response, \
-    get_import_from_storage_operation_progress_response_message_parser, OperationProgressBar, GITHUB_ACTION_PATH
+    ImportFromStorageProgressHook, OperationProgressBar, GITHUB_ACTION_PATH
 from ._network import prepare_mysql_exist_private_dns_zone, prepare_mysql_exist_private_network, prepare_private_network, prepare_private_dns_zone, prepare_public_network
 from ._validators import mysql_arguments_validator, mysql_auto_grow_validator, mysql_georedundant_backup_validator, mysql_restore_tier_validator, \
     mysql_retention_validator, mysql_sku_name_validator, mysql_storage_validator, validate_mysql_replica, validate_server_name, \
@@ -1409,12 +1409,12 @@ def _import_create_server(db_context, cmd, resource_group_name, server_name, cre
     import_progress_bar = None
 
     if data_source_type.lower() == "azure_blob":
-        import_progress_bar = OperationProgressBar(cmd.cli_ctx, import_poller._polling_method._initial_response, get_import_from_storage_operation_progress_response_message_parser)  
+        import_progress_bar = OperationProgressBar(cmd.cli_ctx, import_poller, ImportFromStorageProgressHook())
 
     return resolve_poller(
-        import_poller, cmd.cli_ctx,
+        import_poller, cmd.cli_ctx, 
         '{} Server Import Create'.format(logging_name),
-        import_progress_bar)
+        progress_bar=import_progress_bar)
 
 
 def flexible_server_connection_string(

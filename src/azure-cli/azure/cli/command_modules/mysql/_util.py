@@ -4,7 +4,9 @@
 # --------------------------------------------------------------------------------------------
 
 # pylint: disable=unused-argument, line-too-long, import-outside-toplevel, raise-missing-from
+from enum import Enum
 import json
+import math
 import os
 import random
 import subprocess
@@ -108,7 +110,7 @@ def retryable_method(retries=3, interval_sec=5, exception_type=Exception, condit
     return decorate
 
 
-def resolve_poller(result, cli_ctx, name, progress_bar = None):
+def resolve_poller(result, cli_ctx, name, progress_bar=None):
     if _is_poller(result):
         return LongRunningOperation(cli_ctx, 'Starting {}'.format(name), progress_bar=progress_bar)(result)
     return result
@@ -589,42 +591,120 @@ def get_import_from_storage_operation_progress_response_message_parser(operation
     
     return None
 
+def get_current_utc_time():
+    return datetime.utcnow().replace(tzinfo=dt.timezone.utc)
+
+class ImportFromStorageState(Enum):
+    STARTING = "Starting"
+    PROVISIONING = "Provisioning Server"
+    IMPORTING = "Importing"
+    DEFAULT = "Running"
+
+class ImportFromStorageProgressHook:
+
+    def __init__(self):
+        self._import_started = False
+        self._import_state = ImportFromStorageState.STARTING
+        self._import_estimated_completion_time = None
+
+    def update_progress(self, operation_progress_response):
+        if operation_progress_response is not None:
+            try:
+                jsonresp = json.loads(operation_progress_response.text())
+                self._update_import_from_storage_progress_status(jsonresp)
+            except:
+                pass
+
+    def get_progress_message(self):
+        msg = self._import_state.value
+        if self._import_estimated_completion_time is not None:
+            msg = msg + "  " + self._get_eta_time_duration_in_user_readable_string()
+        elif self._import_state == ImportFromStorageState.IMPORTING :
+            msg = msg + "  " + "Initialzing (This might take few minutes)"
+
+        return msg
+    
+    def _get_eta_time_duration_in_user_readable_string(self):
+        time_remaining = datetime.fromisoformat(self._import_estimated_completion_time) - get_current_utc_time()
+        msg = " ETA : "
+
+        if time_remaining.total_seconds() < 60:
+            return  msg + "Few seconds remaining"
+        
+        days = time_remaining.days
+        hours, remainder = divmod(time_remaining.seconds, 3600)
+        minutes = math.ceil(remainder/60.0)
+        
+        if days > 0:
+            msg = msg + str(days) + " days "
+        if hours > 0:
+            msg = msg + str(hours) + " hours "
+        if minutes > 0:
+            msg = msg + str(minutes) + " minutes "
+        
+        return msg + " remaining"
+
+    def _update_import_from_storage_progress_status(self, progress_resp_json):
+        if "status" in progress_resp_json:
+            progress_status = progress_resp_json["status"]
+            previous_import_state = self._import_state
+
+            # Updating the import state
+            if progress_status == "Importing":
+                self._import_started = True
+                self._import_state = ImportFromStorageState.IMPORTING
+            elif progress_status == "InProgress" and self._import_started == False:
+                self._import_state = ImportFromStorageState.PROVISIONING
+            else:
+                self._import_state = ImportFromStorageState.DEFAULT
+            
+            # Updating the estimated completion time
+            is_state_same = self._import_state == previous_import_state
+            if is_state_same == False:
+                self._import_estimated_completion_time = None
+            if "properties" in progress_resp_json and "estimatedCompletionTime" in progress_resp_json["properties"]:
+                self._import_estimated_completion_time = str(progress_resp_json["properties"]["estimatedCompletionTime"])
+            
+
 """
 TODO: 
-1. Rate control.
 2. Error handling.
 3. Better estimated time completion parsing.
-4. initial_response vs poller
 """
 class OperationProgressBar(IndeterminateProgressBar):
 
-    """ Define progress bar update view """
-    def __init__(self, cli_ctx, initial_response, opertion_progress_resp_msg_parser):
-        self.cnt = 0
-        self.initial_response = initial_response
+    """ Define progress bar update view for operation progress """
+    def __init__(self, cli_ctx, poller, operation_progress_hook, progress_message_update_interval_in_sec = 60.0):
+        self._poller = poller
+        self._operation_progress_hook = operation_progress_hook
+        self._operation_progress_request = self._get_operation_progress_request()
         self._client = get_mysql_flexible_management_client(cli_ctx)
-        self.operation_progress_url = self._get_operation_progress_url()
-        self.operation_progress_request = HttpRequest('GET', self.operation_progress_url)
-        self.operation_progress_resp_msg_parser = opertion_progress_resp_msg_parser
+        self._progress_message_update_interval_in_sec = progress_message_update_interval_in_sec
+        self._progress_message_last_updated = None
         super().__init__(cli_ctx)
 
     def update_progress(self):
-        self.cnt = self.cnt + 1
-        operation_progress_resp = None
+        self._safe_update_progress_message()
+        super().update_progress()
+
+    def _safe_update_progress_message(self):
         try:
-            operation_progress_resp = self._client._send_request(self.operation_progress_request)
+            if self._should_update_progress_message():
+                operation_progress_resp = self._client._send_request(self._operation_progress_request)
+                self._operation_progress_hook.update_progress(operation_progress_resp)
+                self.message = self._operation_progress_hook.get_progress_message()
+                self._progress_message_last_updated = get_current_utc_time()
         except:
             pass
 
-        operation_progress_message = self.operation_progress_resp_msg_parser(operation_progress_resp, self.cnt)
-        if operation_progress_message is not None:
-            self.message = operation_progress_message
-        super().update_progress()
-    
-    def _get_operation_progress_url(self):
-        location_url = self.initial_response.http_response.headers["Location"]
+    def _should_update_progress_message(self):
+        return (self._progress_message_last_updated is None) or ((get_current_utc_time() - self._progress_message_last_updated).total_seconds() > self._progress_message_update_interval_in_sec)
+
+    def _get_operation_progress_request(self):
+        location_url = self._poller._polling_method._initial_response.http_response.headers["Location"]
         operation_progress_url = location_url.replace('operationResults', 'operationProgress')
         operation_progress_url_parsed = urlparse(operation_progress_url)
         query_params = dict(parse_qsl(operation_progress_url_parsed.query))
         query_params['api-version'] = "2023-12-01-preview"
-        return operation_progress_url_parsed._replace(query=urlencode(query_params)).geturl()        
+        updated_operation_progress_url = operation_progress_url_parsed._replace(query=urlencode(query_params)).geturl()
+        return HttpRequest('GET', updated_operation_progress_url)        
